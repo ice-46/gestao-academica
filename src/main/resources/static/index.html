@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestão Acadêmica - Cursos</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+        .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+        .card { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 3px 10px rgba(0,0,0,.08); margin-bottom: 16px; }
+        h1 { margin-top: 0; }
+        form { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: end; }
+        label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+        input { padding: 8px; border: 1px solid #d1d5db; border-radius: 8px; }
+        button { padding: 9px 14px; border: 0; border-radius: 8px; cursor: pointer; }
+        .primary { background: #2563eb; color: #fff; }
+        .secondary { background: #e5e7eb; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 8px; text-align: left; }
+        .actions { display: flex; gap: 8px; }
+        .danger { background: #dc2626; color: #fff; }
+        .edit { background: #f59e0b; color: #fff; }
+        #feedback { min-height: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>Cursos</h1>
+        <p>Cadastre, edite e exclua cursos para testar o sistema.</p>
+        <form id="curso-form">
+            <input type="hidden" id="curso-id" />
+            <label>Nome
+                <input id="nome" placeholder="Ex: Ciência da Computação" required />
+            </label>
+            <label>Turnos
+                <input id="turnos" placeholder="Ex: Manhã, Noite" required />
+            </label>
+            <button class="primary" type="submit" id="submit-btn">Salvar</button>
+            <button class="secondary" type="button" id="cancel-btn">Cancelar edição</button>
+        </form>
+        <p id="feedback"></p>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Turnos</th>
+                <th>Ações</th>
+            </tr>
+            </thead>
+            <tbody id="lista-cursos"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('curso-form');
+    const idInput = document.getElementById('curso-id');
+    const nomeInput = document.getElementById('nome');
+    const turnosInput = document.getElementById('turnos');
+    const feedback = document.getElementById('feedback');
+    const listaCursos = document.getElementById('lista-cursos');
+
+    function setFeedback(message, isError = false) {
+        feedback.textContent = message;
+        feedback.style.color = isError ? '#dc2626' : '#16a34a';
+    }
+
+    function limparFormulario() {
+        idInput.value = '';
+        nomeInput.value = '';
+        turnosInput.value = '';
+    }
+
+    async function carregarCursos() {
+        const response = await fetch('/api/cursos');
+        const cursos = await response.json();
+
+        listaCursos.innerHTML = '';
+        cursos.forEach(curso => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${curso.id}</td>
+                <td>${curso.nome}</td>
+                <td>${curso.turnos}</td>
+                <td class="actions">
+                    <button class="edit" onclick="editarCurso(${curso.id}, '${curso.nome.replace(/'/g, "\\'")}', '${curso.turnos.replace(/'/g, "\\'")}')">Editar</button>
+                    <button class="danger" onclick="excluirCurso(${curso.id})">Excluir</button>
+                </td>
+            `;
+            listaCursos.appendChild(tr);
+        });
+    }
+
+    async function excluirCurso(id) {
+        await fetch(`/api/cursos/${id}`, { method: 'DELETE' });
+        setFeedback('Curso removido com sucesso.');
+        await carregarCursos();
+    }
+
+    function editarCurso(id, nome, turnos) {
+        idInput.value = id;
+        nomeInput.value = nome;
+        turnosInput.value = turnos;
+        setFeedback(`Editando curso #${id}`);
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const payload = {
+            nome: nomeInput.value,
+            turnos: turnosInput.value
+        };
+
+        const id = idInput.value;
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/cursos/${id}` : '/api/cursos';
+
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const erro = await response.json();
+            setFeedback(`Erro: ${JSON.stringify(erro)}`, true);
+            return;
+        }
+
+        setFeedback(id ? 'Curso atualizado com sucesso.' : 'Curso criado com sucesso.');
+        limparFormulario();
+        await carregarCursos();
+    });
+
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+        limparFormulario();
+        setFeedback('Edição cancelada.');
+    });
+
+    carregarCursos();
+    window.editarCurso = editarCurso;
+    window.excluirCurso = excluirCurso;
+</script>
+</body>
+</html>
